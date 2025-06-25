@@ -17,7 +17,6 @@ class OAuthSrv
 
     public function __construct(
         private string $clientAud,
-        private string $pathToP12,
         private string $secretAlg
     ) {
         $this->setJWKPrivateKey();
