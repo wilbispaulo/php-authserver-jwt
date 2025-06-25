@@ -7,40 +7,28 @@ use DateTimeZone;
 use Jose\Component\Core\JWK;
 use Jose\Component\Core\AlgorithmManager;
 use Jose\Component\KeyManagement\JWKFactory;
+use Jose\Component\Signature\Algorithm\HS256;
 use Jose\Component\Signature\JWSBuilder;
-use Jose\Component\Signature\Algorithm\RS256;
 use Jose\Component\Signature\Serializer\CompactSerializer;
-
 
 class OAuthSrv
 {
-    private string $privatePEM;
     private JWK $privateJWK;
 
     public function __construct(
         private string $clientAud,
         private string $pathToP12,
-        private string $secretCert
+        private string $secretAlg
     ) {
-        if (count($p12 = glob($this->pathToP12)) > 0) {
-            $this->setPrivateKeyP12($p12[0]);
-        };
-    }
-    private function setPrivateKeyP12(string $pathToP12)
-    {
-        $certP12 = file_get_contents($pathToP12);
-        openssl_pkcs12_read($certP12, $certPEM, $this->secretCert);
-        $this->privatePEM = $certPEM['pkey'];
         $this->setJWKPrivateKey();
     }
 
     private function setJWKPrivateKey()
     {
-        $this->privateJWK = JWKFactory::createFromKey(
-            $this->privatePEM,
-            null,
+        $this->privateJWK = JWKFactory::createFromSecret(
+            $this->secretAlg,
             [
-                'alg' => 'RS256',
+                'alg' => 'HS256',
                 'use' => 'sig'
             ]
         );
@@ -63,7 +51,7 @@ class OAuthSrv
         ];
     }
 
-    public function tokenJWT(string $issuer, int $tokenExp, string $clientId, string $clientSecret, array $scope): string
+    public function tokenJWT(string $issuer, int $tokenExp, array $scope): string
     {
         $baseTime = time();
         $baseClaims = [
@@ -74,7 +62,7 @@ class OAuthSrv
             'aud' => $this->clientAud,
             'scope' => $scope,
         ];
-        $jwsBuilder = new JWSBuilder(new AlgorithmManager([new RS256]));
+        $jwsBuilder = new JWSBuilder(new AlgorithmManager([new HS256]));
         $payload = json_encode($baseClaims);
 
         $jws = $jwsBuilder
@@ -83,12 +71,11 @@ class OAuthSrv
             ->addSignature(
                 $this->privateJWK,
                 [
-                    'alg' => 'RS256',
+                    'alg' => 'HS256',
                     'typ' => 'JWT',
                 ]
             )
             ->build();
-        $serializer = new CompactSerializer;
         return (new CompactSerializer)->serialize($jws, 0);
     }
 
